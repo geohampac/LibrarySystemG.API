@@ -1,6 +1,5 @@
 ﻿using System.Data;
 using System.Data.SqlClient;
-using System.Threading.Tasks;
 using Dapper;
 using LibrarySystemG.API.IRepository;
 using LibrarySystemG.API.Model;
@@ -13,52 +12,65 @@ namespace LibrarySystemG.API.Class
     public class LoginClass : ILoginRepository
     {
         private readonly string _connectionString;
-        private readonly IConfiguration _config;
+        private readonly TokenService _tokenService;
 
         public LoginClass(IConfiguration config)
         {
-            _config = config;
             _connectionString = config.GetConnectionString("trackerlibrary");
+            _tokenService = new TokenService(config);
         }
 
         public async Task<ServiceResponse<LoginResponseModel>> Login(LoginModel model)
         {
-            var service = new ServiceResponse<LoginResponseModel>();
+            var response = new ServiceResponse<LoginResponseModel>();
 
-            using (var conn = new SqlConnection(_connectionString))
+            try
             {
-                var param = new DynamicParameters();
-                param.Add("@Username", model.Username);
-                param.Add("@Password", model.Password);
+                using var conn = new SqlConnection(_connectionString);
+
+                var parameters = new DynamicParameters();
+                parameters.Add("@Username", model.Username);
+                parameters.Add("@Password", model.Password);
 
                 var user = await conn.QueryFirstOrDefaultAsync<LoginResponseModel>(
                     "LIBRARYSYSTEM_LOGINUSER",
-                    param,
+                    parameters,
                     commandType: CommandType.StoredProcedure
                 );
 
                 if (user == null)
                 {
-                    service.Status = 400;
-                    service.Success = false;
-                    service.Message = "Invalid username or password";
-                    return service;
+                    return new ServiceResponse<LoginResponseModel>
+                    {
+                        Status = 400,
+                        Success = false,
+                        Message = "Invalid username or password"
+                    };
                 }
 
-                
-                var tokenService = new TokenService(_config);
-                string token = tokenService.GenerateToken(user.Username, "User");
+                // Generate Token
+                user.Token = _tokenService.GenerateToken(user.Username, "User");
 
-                user.Password = null; 
-                user.Token = token;
+                // Hide password
+                user.Password = null;
 
-                service.Status = 200;
-                service.Success = true;
-                service.Message = "Login successful";
-                service.Data = user;
+                return new ServiceResponse<LoginResponseModel>
+                {
+                    Status = 200,
+                    Success = true,
+                    Message = "Login successful",
+                    Data = user
+                };
             }
-
-            return service;
+            catch (Exception ex)
+            {
+                return new ServiceResponse<LoginResponseModel>
+                {
+                    Status = 500,
+                    Success = false,
+                    Message = $"Error: {ex.Message}"
+                };
+            }
         }
     }
 }

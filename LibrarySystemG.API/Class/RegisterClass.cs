@@ -1,7 +1,7 @@
 ﻿using System.Data;
 using System.Data.SqlClient;
 using Dapper;
-    using LibrarySystemG.API.IRepository;
+using LibrarySystemG.API.IRepository;
 using LibrarySystemG.API.Model;
 using LibrarySystemG.API.Model.Response;
 
@@ -18,52 +18,51 @@ namespace LibrarySystemG.API.Class
 
         public async Task<ServiceResponse<RegisterResponseModel>> Register(RegisterModel model)
         {
-            var service = new ServiceResponse<RegisterResponseModel>();
-
             try
             {
-                using (var conn = new SqlConnection(_connectionString))
+                using var conn = new SqlConnection(_connectionString);
+
+                var parameters = new DynamicParameters();
+                parameters.Add("@FirstName", model.FirstName);
+                parameters.Add("@LastName", model.LastName);
+                parameters.Add("@Username", model.Username);
+                parameters.Add("@Password", model.Password);
+                parameters.Add("@Course", model.Course);
+                parameters.Add("@Email", model.Email);
+
+                var result = await conn.QueryFirstOrDefaultAsync<RegisterResponseModel>(
+                    "LIBRARYSYSTEM_REGISTER",
+                    parameters,
+                    commandType: CommandType.StoredProcedure
+                );
+
+                if (result == null)
                 {
-                    var param = new DynamicParameters();
-
-                    param.Add("@FirstName", model.FirstName);
-                    param.Add("@LastName", model.LastName);
-                    param.Add("@Username", model.Username);
-                    param.Add("@Password", model.Password);
-                    param.Add("@Course", model.Course);
-                    param.Add("@Email", model.Email);
-
-                    var result = await conn.QueryFirstOrDefaultAsync<RegisterResponseModel>(
-                        "LIBRARYSYSTEM_REGISTER",
-                        param,
-                        commandType: CommandType.StoredProcedure
-                    );
-
-                    if (result == null)
+                    return new ServiceResponse<RegisterResponseModel>
                     {
-                        service.Status = 400;
-                        service.Success = false;
-                        service.Message = "Registration failed";
-                        service.Data = null;
-                    }
-                    else
-                    {
-                        service.Status = 200;
-                        service.Success = true;
-                        service.Message = result.Message;
-                        service.Data = result;
-                    }
+                        Status = 400,
+                        Success = false,
+                        Message = "Registration failed"
+                    };
                 }
+
+                return new ServiceResponse<RegisterResponseModel>
+                {
+                    Status = 200,
+                    Success = true,
+                    Message = result.Message,
+                    Data = result
+                };
             }
             catch (Exception ex)
             {
-                service.Status = 500;
-                service.Success = false;
-                service.Message = ex.Message;
-                service.Data = null;
+                return new ServiceResponse<RegisterResponseModel>
+                {
+                    Status = 500,
+                    Success = false,
+                    Message = $"Error: {ex.Message}"
+                };
             }
-
-            return service;
         }
     }
-}
+}x`
