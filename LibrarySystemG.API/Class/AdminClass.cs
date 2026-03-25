@@ -9,6 +9,11 @@ namespace LibrarySystemG.API.Class
     {
         private readonly IConfiguration _config;
 
+        // Constants for admin credentials (easy to change later)
+        private const string AdminUsername = "geoadmin";
+        private const string AdminPassword = "geo1234";
+        private const string AdminRole = "Admin";
+
         public AdminClass(IConfiguration config)
         {
             _config = config;
@@ -16,12 +21,26 @@ namespace LibrarySystemG.API.Class
 
         public async Task<object> AdminLogin(AdminModel admin)
         {
+            // simulate async operation
             await Task.Delay(50);
 
-            if (admin.Username == "geoadmin" && admin.Password == "geo1234")
+            // validate input
+            if (admin == null ||
+                string.IsNullOrWhiteSpace(admin.Username) ||
+                string.IsNullOrWhiteSpace(admin.Password))
+            {
+                return new
+                {
+                    Success = false,
+                    Message = "Username and password are required"
+                };
+            }
+
+            // check credentials
+            if (admin.Username == AdminUsername && admin.Password == AdminPassword)
             {
                 var tokenService = new TokenService(_config);
-                var token = tokenService.GenerateToken(admin.Username, "Admin");
+                var token = tokenService.GenerateToken(admin.Username, AdminRole);
 
                 return new
                 {
@@ -31,6 +50,7 @@ namespace LibrarySystemG.API.Class
                 };
             }
 
+            // invalid login
             return new
             {
                 Success = false,
