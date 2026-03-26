@@ -5,7 +5,6 @@ using LibrarySystemG.API.IRepository;
 using LibrarySystemG.API.Model;
 using LibrarySystemG.API.Model.Request;
 using LibrarySystemG.API.Model.Response;
-using Microsoft.Extensions.Configuration;
 
 namespace LibrarySystemG.API.Class
 {
@@ -14,63 +13,90 @@ namespace LibrarySystemG.API.Class
         private readonly string _connectionString;
         private readonly TokenService _tokenService;
 
-        public LoginClass(IConfiguration config)
+        private const string LoginStoredProcedure = "LIBRARYSYSTEM_LOGINUSER";
+        private const string DefaultRole = "User";
+
+        public LoginClass(IConfiguration config, TokenService tokenService)
         {
             _connectionString = config.GetConnectionString("trackerlibrary");
-            _tokenService = new TokenService(config);
+            _tokenService = tokenService;
         }
 
         public async Task<ServiceResponse<LoginResponseModel>> Login(LoginModel model)
         {
-            var response = new ServiceResponse<LoginResponseModel>();
+            if (!IsValidRequest(model))
+                return BadRequest("Username and password are required");
 
             try
             {
-                using var conn = new SqlConnection(_connectionString);
-
-                var parameters = new DynamicParameters();
-                parameters.Add("@Username", model.Username);
-                parameters.Add("@Password", model.Password);
+                using var conn = CreateConnection();
 
                 var user = await conn.QueryFirstOrDefaultAsync<LoginResponseModel>(
-                    "LIBRARYSYSTEM_LOGINUSER",
-                    parameters,
+                    LoginStoredProcedure,
+                    new
+                    {
+                        model.Username,
+                        model.Password
+                    },
                     commandType: CommandType.StoredProcedure
                 );
 
                 if (user == null)
-                {
-                    return new ServiceResponse<LoginResponseModel>
-                    {
-                        Status = 400,
-                        Success = false,
-                        Message = "Invalid username or password"
-                    };
-                }
+                    return Unauthorized("Invalid username or password");
 
-                // Generate Token
-                user.Token = _tokenService.GenerateToken(user.Username, "User");
-
-                // Hide password
+                user.Token = _tokenService.GenerateToken(user.Username, DefaultRole);
                 user.Password = null;
 
-                return new ServiceResponse<LoginResponseModel>
-                {
-                    Status = 200,
-                    Success = true,
-                    Message = "Login successful",
-                    Data = user
-                };
+                return Success("Login successful", user);
             }
-            catch (Exception ex)
+            catch
             {
-                return new ServiceResponse<LoginResponseModel>
-                {
-                    Status = 500,
-                    Success = false,
-                    Message = $"Error: {ex.Message}"
-                };
+                // Don't expose internal errors in production
+                return Error("An unexpected error occurred");
             }
         }
+
+        // 🔹 Helpers
+
+        private IDbConnection CreateConnection() =>
+            new SqlConnection(_connectionString);
+
+        private static bool IsValidRequest(LoginModel model) =>
+            model != null &&
+            !string.IsNullOrWhiteSpace(model.Username) &&
+            !string.IsNullOrWhiteSpace(model.Password);
+
+        private static ServiceResponse<LoginResponseModel> Success(string message, LoginResponseModel data) =>
+            new()
+            {
+                Status = 200,
+                Success = true,
+                Message = message,
+                Data = data
+            };
+
+        private static ServiceResponse<LoginResponseModel> BadRequest(string message) =>
+            new()
+            {
+                Status = 400,
+                Success = false,
+                Message = message
+            };
+
+        private static ServiceResponse<LoginResponseModel> Unauthorized(string message) =>
+            new()
+            {
+                Status = 401,
+                Success = false,
+                Message = message
+            };
+
+        private static ServiceResponse<LoginResponseModel> Error(string message) =>
+            new()
+            {
+                Status = 500,
+                Success = false,
+                Message = message
+            };
     }
 }
