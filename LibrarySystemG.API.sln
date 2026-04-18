@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.37012.4 d17.14
+VisualStudioVersion = 17.14.37012.4
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LibrarySystemG.API", "LibrarySystemG.API\LibrarySystemG.API.csproj", "{B9D0AE9A-BBEF-4A9A-8C8C-B0EE3C36A40D}"
 EndProject

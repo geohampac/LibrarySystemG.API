@@ -1,12 +1,11 @@
-﻿using LibrarySystemG.API.IRepository;   
+﻿using LibrarySystemG.API.IRepository;
 using LibrarySystemG.API.Model;
-using LibrarySystemG.API.Model.Response;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LibrarySystemG.API.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
+    [Route("api/[controller]")]
     public class RegisterController : ControllerBase
     {
         private readonly IRegisterRepository _registerRepository;
@@ -19,17 +18,31 @@ namespace LibrarySystemG.API.Controllers
         [HttpPost]
         public async Task<IActionResult> UserRegister([FromBody] RegisterModel register)
         {
-           
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "Invalid input data"
+                });
+            }
+
             var response = await _registerRepository.Register(register);
 
             if (!response.Success)
             {
-               
-                return BadRequest(response);
+                return BadRequest(new
+                {
+                    success = false,
+                    message = response.Message
+                });
             }
 
-           
-            return Ok(response);
+            return Ok(new
+            {
+                success = true,
+                message = response.Message
+            });
         }
     }
 }
